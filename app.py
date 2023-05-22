@@ -15,8 +15,7 @@ from langchain.chat_models import ChatOpenAI
 st.title("ChatGPT with Document Query")
 
 # Define necessary embedding model, LLM, and vectorstore
-os.environ["OPENAI_API_KEY"] = "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"
-os.environ["PINECONE_API_KEY"] = "56c63cdc-0589-42b3-bb33-61b37e2ba5de"
+
 pinecone.init(api_key=os.environ["PINECONE_API_KEY"], environment="us-west4-gcp")
 index = pinecone.Index("dev")
 text_key = "text"
