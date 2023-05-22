@@ -1,7 +1,5 @@
 import streamlit as st
-import pandas as pd
 import os
-import base64
 from langchain.document_loaders import PyPDFLoader
 import os
 import pinecone
