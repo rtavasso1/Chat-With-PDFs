@@ -4,9 +4,46 @@ import os
 import base64
 from langchain.document_loaders import PyPDFLoader
 import os
-
+import pinecone
+from langchain.vectorstores import Pinecone
+from langchain.prompts.prompt import PromptTemplate
+from langchain.chains import ConversationChain
+from langchain.memory import ConversationBufferMemory
+from langchain.embeddings.openai import OpenAIEmbeddings
+from langchain.chat_models import ChatOpenAI
 
 st.title("ChatGPT with Document Query")
+
+# Define necessary embedding model, LLM, and vectorstore
+os.environ["OPENAI_API_KEY"] = "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"
+os.environ["PINECONE_API_KEY"] = "56c63cdc-0589-42b3-bb33-61b37e2ba5de"
+pinecone.init(api_key=os.environ["PINECONE_API_KEY"], environment="us-west4-gcp")
+index = pinecone.Index("dev")
+text_key = "text"
+embed = OpenAIEmbeddings()
+vectorstore = Pinecone(
+    index, embed.embed_query, text_key
+)
+
+
+def initialize_conversation():
+    chat = ChatOpenAI(temperature=0)
+    template = """The following is a friendly conversation between a human and an AI. The AI is talkative and provides lots of specific details from its context. If the AI does not know the answer to a question, it truthfully says it does not know.
+
+    Current conversation:
+    {history}
+    Friend: {input}
+    AI:"""
+    PROMPT = PromptTemplate(
+        input_variables=["history", "input"], template=template
+    )
+    st.session_state.conversation = ConversationChain(
+        prompt=PROMPT,
+        llm=chat, 
+        verbose=False, 
+        memory=ConversationBufferMemory(human_prefix="Friend", )
+    )
+
 
 # Read the files from the directory
 directory = r"./example-docs"
@@ -14,40 +51,71 @@ files = []
 if directory:
     for file in os.listdir(directory):
         if file.endswith(".txt") or file.endswith(".pdf") or file.endswith(".docx") or file.endswith(".xlsx"):
-            files.append(file)
+            files.append('example-docs/'+file)
 st.write("Uploads are unavailable. The available files are listed below.")
 
 # Add a way to select which files to use for the model query
 selected_files = st.multiselect("Please select the files to query:", options=files)
 
-def process_files(selected_files):
-    for file in selected_files:
-        # add directory to file
-        file = os.path.join(directory, file)
-        loader = PyPDFLoader(file)
-        document = loader.load()
-        st.write(document)
-    return
+# Add a slider for number of sources to return 1-5
+num_sources = st.slider("Number of sources:", min_value=1, max_value=5, value=1)
 
-if st.button("Process Files"):
-    process_files(selected_files)
+def getTopK(query, doc_name):
+    related = vectorstore.similarity_search_with_score(query, num_sources, namespace=doc_name)
+    return related
+
 def model_query(query, document_names):
-    response = f"Sample response for the query '{query}' over the documents: {', '.join(document_names)}"
-    return response
+    
+    if len(st.session_state.chat_history) == 1:
+        all_related = []
+        for document_name in document_names:
+            related = getTopK(query, document_name)
+            all_related.extend(related)
+        all_related = sorted(all_related, key=lambda x: x[1], reverse=True)
+
+        related = all_related[:num_sources]
+        related = [r[0] for r in related] # remove scores
+        context = " ".join([r.page_content for r in related])
+        ai_message = st.session_state.conversation.predict(input=context+query)
+        return ai_message, related
+    else:
+        ai_message = st.session_state.conversation.predict(input=query)
+        return ai_message, None
+    #response = f"Sample response for the query '{query}' over the documents: {', '.join(document_names)}"
+    
 
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
+    initialize_conversation()
 
-user_input = st.text_input("Ask a question over the selected documents:")
+if st.button('Reset Chat'):
+    st.session_state.chat_history = []
+    initialize_conversation()
+    st.experimental_rerun()
 
-if user_input:
+#user_input = st.text_input("Ask a question over the selected documents:")
+with st.form(key='user_input_form'):
+    user_input = st.text_input("Ask a question over the selected documents:")
+    submit_button = st.form_submit_button(label='Submit')
+
+
+if submit_button:
     st.session_state.chat_history.append({"role": "user", "content": user_input})
-    model_response = model_query(user_input, selected_files)
+    model_response, context = model_query(user_input, selected_files)
     st.session_state.chat_history.append({"role": "model", "content": model_response})
+    if context:
+        st.session_state.chat_history.append({"role": "context", "content": context})
     user_input = ""
 
 for message in st.session_state.chat_history:
     if message["role"] == "user":
         st.markdown(f"> **User**: {message['content']}")
-    else:
+    elif message["role"] == "model":
         st.markdown(f"> **Model**: {message['content']}")
+    elif message["role"] == "context":
+        with st.expander("Click to see the context"):
+            for doc in message["content"]:
+                st.markdown(f"> **Context Document**: {doc.metadata['source']}")
+                st.markdown(f"> **Page Number**: {doc.metadata['page']}")
+                st.markdown(f"> **Content**: {doc.page_content}")
+
