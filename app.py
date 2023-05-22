@@ -1,6 +1,5 @@
 import streamlit as st
 import os
-from langchain.document_loaders import PyPDFLoader
 import os
 import pinecone
 from langchain.vectorstores import Pinecone
