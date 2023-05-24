@@ -23,7 +23,7 @@ vectorstore = Pinecone(
 
 
 def initialize_conversation():
-    chat = ChatOpenAI(temperature=0)
+    chat = ChatOpenAI(temperature=0, model_name="gpt-4")
     template = """The following is a friendly conversation between a human and an AI. The AI is talkative and provides lots of specific details from its context. If the AI does not know the answer to a question, it truthfully says it does not know.
 
     Current conversation:
