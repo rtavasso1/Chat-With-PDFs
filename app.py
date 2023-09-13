@@ -11,7 +11,7 @@ import pickle
 st.title("ChatGPT with Document Query")
 
 # Define necessary embedding model, LLM, and vectorstore
-
+openai_api_key = st.secrets["OPENAI_API_KEY"]
 text_key = "text"
 with open('faiss_indices.pkl', 'rb') as f:
     faiss_indices = pickle.load(f)
