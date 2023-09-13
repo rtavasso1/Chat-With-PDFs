@@ -1,3 +1,4 @@
 langchain
 pinecone-client
 openai
+faiss-cpu
