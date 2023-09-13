@@ -54,7 +54,7 @@ selected_files = st.multiselect("Please select the files to query:", options=fil
 num_sources = st.slider("Number of sources per document:", min_value=1, max_value=5, value=1)
 
 def getTopK(query, doc_name):
-    related = faiss_indices[doc_name].similarity_search(query, k=num_sources)
+    related = faiss_indices[doc_name].similarity_search_with_score(query, k=num_sources)
     return related
 
 def model_query(query, document_names):
