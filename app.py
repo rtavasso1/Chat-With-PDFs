@@ -44,7 +44,7 @@ if directory:
         if file.endswith(".txt") or file.endswith(".pdf") or file.endswith(".docx") or file.endswith(".xlsx"):
             #if file == 'imagebind.pdf': file = 'ImageBind.pdf'
             #if file == 'megabyte.pdf': file = 'MegaByte.pdf'
-            files.append('example-docs/'+file)
+            files.append('example-docs\\'+file)
 st.write("Uploads are unavailable. The available files are listed below.")
 
 # Add a way to select which files to use for the model query
