@@ -1,25 +1,20 @@
 import streamlit as st
 import os
-import os
-import pinecone
-from langchain.vectorstores import Pinecone
+from langchain.vectorstores import FAISS
 from langchain.prompts.prompt import PromptTemplate
 from langchain.chains import ConversationChain
 from langchain.memory import ConversationBufferMemory
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.chat_models import ChatOpenAI
+import pickle
 
 st.title("ChatGPT with Document Query")
 
 # Define necessary embedding model, LLM, and vectorstore
 
-pinecone.init(api_key=os.environ["PINECONE_API_KEY"], environment="us-west4-gcp")
-index = pinecone.Index("dev")
 text_key = "text"
-embed = OpenAIEmbeddings()
-vectorstore = Pinecone(
-    index, embed.embed_query, text_key
-)
+with open('faiss_indices.pkl', 'rb') as f:
+    faiss_indices = pickle.load(f)
 
 
 def initialize_conversation():
@@ -47,8 +42,8 @@ files = []
 if directory:
     for file in os.listdir(directory):
         if file.endswith(".txt") or file.endswith(".pdf") or file.endswith(".docx") or file.endswith(".xlsx"):
-            if file == 'imagebind.pdf': file = 'ImageBind.pdf'
-            if file == 'megabyte.pdf': file = 'MegaByte.pdf'
+            #if file == 'imagebind.pdf': file = 'ImageBind.pdf'
+            #if file == 'megabyte.pdf': file = 'MegaByte.pdf'
             files.append('example-docs/'+file)
 st.write("Uploads are unavailable. The available files are listed below.")
 
@@ -56,10 +51,10 @@ st.write("Uploads are unavailable. The available files are listed below.")
 selected_files = st.multiselect("Please select the files to query:", options=files)
 
 # Add a slider for number of sources to return 1-5
-num_sources = st.slider("Number of sources:", min_value=1, max_value=5, value=1)
+num_sources = st.slider("Number of sources per document:", min_value=1, max_value=5, value=1)
 
 def getTopK(query, doc_name):
-    related = vectorstore.similarity_search_with_score(query, num_sources, namespace=doc_name)
+    related = faiss_indices[doc_name].similarity_search(query, k=num_sources)
     return related
 
 def model_query(query, document_names):
