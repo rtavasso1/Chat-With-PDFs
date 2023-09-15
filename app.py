@@ -6,15 +6,20 @@ from langchain.chains import ConversationChain
 from langchain.memory import ConversationBufferMemory
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.chat_models import ChatOpenAI
+from langchain.document_loaders import PyPDFLoader
+import glob
 import pickle
+
+filenames = glob.glob("example-docs/*.pdf")
+loaders = [PyPDFLoader(filename) for filename in filenames]
+listOfPages = [loader.load_and_split() for loader in loaders] # list of list of dict with keys "page_content", "metadata" {"source", "page"}
+faiss_indices = {filename: FAISS.from_documents(pages, OpenAIEmbeddings(disallowed_special=())) for filename, pages in zip(filenames,listOfPages)} # dict of FAISS indexes 
 
 st.title("ChatGPT with Document Query")
 
 # Define necessary embedding model, LLM, and vectorstore
 openai_api_key = st.secrets["OPENAI_API_KEY"]
 text_key = "text"
-with open('faiss_indices.pkl', 'rb') as f:
-    faiss_indices = pickle.load(f)
 
 
 def initialize_conversation():
@@ -54,7 +59,7 @@ selected_files = st.multiselect("Please select the files to query:", options=fil
 num_sources = st.slider("Number of sources per document:", min_value=1, max_value=5, value=1)
 
 def getTopK(query, doc_name):
-    related = faiss_indices[doc_name].similarity_search_with_score(query, k=num_sources)
+    related = faiss_indices[doc_name].similarity_search_with_relevance_scores(query, k=num_sources)
     return related
 
 def model_query(query, document_names):
