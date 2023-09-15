@@ -10,10 +10,15 @@ from langchain.document_loaders import PyPDFLoader
 import glob
 import pickle
 
-filenames = glob.glob("example-docs/*.pdf")
-loaders = [PyPDFLoader(filename) for filename in filenames]
-listOfPages = [loader.load_and_split() for loader in loaders] # list of list of dict with keys "page_content", "metadata" {"source", "page"}
-faiss_indices = {filename: FAISS.from_documents(pages, OpenAIEmbeddings(disallowed_special=())) for filename, pages in zip(filenames,listOfPages)} # dict of FAISS indexes 
+@st.cache()
+def load_vectorstore():
+    filenames = glob.glob("example-docs/*.pdf")
+    loaders = [PyPDFLoader(filename) for filename in filenames]
+    listOfPages = [loader.load_and_split() for loader in loaders] # list of list of dict with keys "page_content", "metadata" {"source", "page"}
+    faiss_indices = {filename: FAISS.from_documents(pages, OpenAIEmbeddings(disallowed_special=())) for filename, pages in zip(filenames,listOfPages)} # dict of FAISS indexes 
+    return faiss_indices
+
+faiss_indices = load_vectorstore()
 
 st.title("ChatGPT with Document Query")
 
@@ -49,7 +54,7 @@ if directory:
         if file.endswith(".txt") or file.endswith(".pdf") or file.endswith(".docx") or file.endswith(".xlsx"):
             #if file == 'imagebind.pdf': file = 'ImageBind.pdf'
             #if file == 'megabyte.pdf': file = 'MegaByte.pdf'
-            files.append('example-docs\\'+file)
+            files.append('example-docs/'+file)
 st.write("Uploads are unavailable. The available files are listed below.")
 
 # Add a way to select which files to use for the model query
