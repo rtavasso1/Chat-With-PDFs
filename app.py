@@ -11,6 +11,8 @@ import glob
 import pickle
 from pathlib import Path
 import hashlib
+import tempfile
+import shutil
 import logging
 logging.basicConfig(level=logging.INFO)
 
@@ -25,9 +27,9 @@ def hash_content(content):
     return hashlib.md5(content.encode('utf-8')).hexdigest()
 
 @st.cache_resource()
-def load_vectorstore():
+def load_vectorstore(upload_folder):
     example_docs_path = Path("example-docs")
-    filenames = list(example_docs_path.glob("*.pdf"))  # This will find all PDFs in the directory
+    filenames = list(Path("example-docs").glob("*.pdf")) + list(upload_folder.glob("*.pdf"))
 
     loaders = [PyPDFLoader(str(filename)) for filename in filenames]
     listOfPages = [loader.load_and_split() for loader in loaders]  # list of list of dict with keys "page_content", "metadata" {"source", "page"}
@@ -36,7 +38,9 @@ def load_vectorstore():
     
     return faiss_indices
 
-faiss_indices = load_vectorstore()
+upload_folder = Path(tempfile.mkdtemp())
+
+faiss_indices = load_vectorstore(upload_folder)
 
 def initialize_conversation():
     chat = ChatOpenAI(model_name=model_version, temperature=0)
@@ -106,14 +110,16 @@ def model_query(query, document_names):
 # Sidebar elements for file uploading and selecting options
 with st.sidebar:
     st.title("Document Query Settings")
-    
+
     uploaded_files = st.file_uploader("Choose files", accept_multiple_files=True)
     if uploaded_files:
         for uploaded_file in uploaded_files:
-            file_path = Path("example-docs") / uploaded_file.name
+            # Write each uploaded file to the temporary directory
+            file_path = upload_folder / uploaded_file.name
             with file_path.open("wb") as f:
                 f.write(uploaded_file.getbuffer())
-        faiss_indices = load_vectorstore()  # Reload the vectorstore with new files
+        # Reload the vectorstore with new files including uploaded ones
+        faiss_indices = load_vectorstore(upload_folder)  
 
     # Add a way to select which files to use for the model query
     selected_files = st.multiselect("Please select the files to query:", options=files)
@@ -195,3 +201,9 @@ if submit_button and user_input:
 
     # Use st.experimental_rerun() to update the display immediately after sending the message
     st.experimental_rerun()
+
+def clean_up_temp_dir():
+    if upload_folder.is_dir():
+        shutil.rmtree(upload_folder)
+
+st.on_session_end(clean_up_temp_dir)
