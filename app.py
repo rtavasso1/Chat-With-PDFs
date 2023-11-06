@@ -38,7 +38,12 @@ def load_vectorstore(upload_folder):
     
     return faiss_indices
 
-upload_folder = Path(tempfile.mkdtemp())
+@st.cache_data(allow_output_mutation=True, show_spinner=False, hash_funcs={tempfile.TemporaryDirectory: lambda _: None})
+def get_temporary_directory():
+    return tempfile.TemporaryDirectory()
+
+temp_dir = get_temporary_directory()
+upload_folder = Path(temp_dir.name)
 
 faiss_indices = load_vectorstore(upload_folder)
 
@@ -129,7 +134,7 @@ with st.sidebar:
 
     model_version = st.selectbox(
         "Select the GPT model version:",
-        options=["gpt-3.5-turbo", "gpt-4"],
+        options=["gpt-3.5-turbo-1106", "gpt-4-1106-preview"],
         index=0  # Default to gpt-3.5-turbo
     )
 
