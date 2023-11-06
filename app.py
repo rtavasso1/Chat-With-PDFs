@@ -38,7 +38,7 @@ def load_vectorstore(upload_folder):
     
     return faiss_indices
 
-@st.cache_data(allow_output_mutation=True, show_spinner=False, hash_funcs={tempfile.TemporaryDirectory: lambda _: None})
+@st.cache_data(hash_funcs={tempfile.TemporaryDirectory: lambda _: None})
 def get_temporary_directory():
     return tempfile.TemporaryDirectory()
 
@@ -206,9 +206,3 @@ if submit_button and user_input:
 
     # Use st.experimental_rerun() to update the display immediately after sending the message
     st.experimental_rerun()
-
-def clean_up_temp_dir():
-    if upload_folder.is_dir():
-        shutil.rmtree(upload_folder)
-
-st.on_session_end(clean_up_temp_dir)
