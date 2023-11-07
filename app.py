@@ -45,7 +45,10 @@ def load_vectorstore(buffers=None):
             with open(temp_file.name, 'wb') as f:
                 f.write(buffer.getbuffer())  # Write buffer contents to a temporary file
             buffer_loader = PyPDFLoader(temp_file.name)
-            listOfBufferPages.append(buffer_loader.load_and_split())
+            bufferPages = buffer_loader.load_and_split()
+            for page in bufferPages:
+                page.metadata['source'] = buffer.name
+            listOfBufferPages.append(bufferPages)
             temp_file.close()  # Close the file so PyPDFLoader can access it
 
     all_pages = listOfPages + listOfBufferPages if buffers else listOfPages
