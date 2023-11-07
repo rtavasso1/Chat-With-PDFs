@@ -26,7 +26,7 @@ text_key = "text"
 def hash_content(content):
     return hashlib.md5(content.encode('utf-8')).hexdigest()
 
-@st.cache_resource()
+@st.cache_data()
 def load_vectorstore(upload_folder):
     example_docs_path = Path("example-docs")
     filenames = list(Path("example-docs").glob("*.pdf")) + list(upload_folder.glob("*.pdf"))
@@ -38,7 +38,7 @@ def load_vectorstore(upload_folder):
     
     return faiss_indices
 
-@st.cache_data(hash_funcs={tempfile.TemporaryDirectory: lambda _: None})
+@st.cache_data()
 def get_temporary_directory():
     return tempfile.TemporaryDirectory()
 
@@ -142,7 +142,7 @@ with st.sidebar:
     if st.button('Reset Chat'):
         st.session_state.chat_history = []
         initialize_conversation()
-        st.experimental_rerun()
+        st.rerun()
 
 if "context_hashes" not in st.session_state:
     st.session_state.context_hashes = set()
@@ -177,9 +177,10 @@ chat_container = st.container()
 # Handle chat input and display
 with chat_container:
     # Then the chat input form at the bottom
-    with st.form(key='user_input_form', clear_on_submit=True):
-        user_input = st.text_input("Ask a question over the selected documents:", key="user_input")
-        submit_button = st.form_submit_button(label='Submit')
+    #with st.form(key='user_input_form', clear_on_submit=True):
+    #    user_input = st.text_input("Ask a question over the selected documents:", key="user_input")
+    #    submit_button = st.form_submit_button(label='Submit')
+    user_input = st.chat_input("Ask something", key="user_input")
 
     for message in st.session_state.chat_history:
         if message["role"] == "user":
@@ -195,14 +196,12 @@ with chat_container:
 
 
 # Handle chat input and display
-if submit_button and user_input:
+if user_input:
     st.session_state.chat_history.append({"role": "user", "content": user_input})
     model_response, context = model_query(user_input, selected_files)
     st.session_state.chat_history.append({"role": "model", "content": model_response})
     if context:
         st.session_state.chat_history.append({"role": "context", "content": context})
-    # Clear the input box after the message is sent
-    #st.session_state.user_input = ""
 
-    # Use st.experimental_rerun() to update the display immediately after sending the message
-    st.experimental_rerun()
+    # Use st.rerun() to update the display immediately after sending the message
+    st.rerun()
