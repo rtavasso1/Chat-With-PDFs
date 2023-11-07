@@ -26,26 +26,44 @@ text_key = "text"
 def hash_content(content):
     return hashlib.md5(content.encode('utf-8')).hexdigest()
 
-@st.cache_data()
-def load_vectorstore(upload_folder):
+@st.cache_resource()
+def load_vectorstore(buffers=None):
     example_docs_path = Path("example-docs")
-    filenames = list(Path("example-docs").glob("*.pdf")) + list(upload_folder.glob("*.pdf"))
+    filenames = list(example_docs_path.glob("*.pdf"))
 
     loaders = [PyPDFLoader(str(filename)) for filename in filenames]
-    listOfPages = [loader.load_and_split() for loader in loaders]  # list of list of dict with keys "page_content", "metadata" {"source", "page"}
-    
-    faiss_indices = {str(filename): FAISS.from_documents(pages, OpenAIEmbeddings(disallowed_special=())) for filename, pages in zip(filenames, listOfPages)}  # dict of FAISS indexes
-    
+    listOfPages = [loader.load_and_split() for loader in loaders]
+
+    listOfBufferPages = []
+    buffer_names = []
+
+    if buffers:
+        # Create temporary files for buffers and load them
+        for buffer in buffers:
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+            buffer_names.append(buffer.name)
+            with open(temp_file.name, 'wb') as f:
+                f.write(buffer.getbuffer())  # Write buffer contents to a temporary file
+            buffer_loader = PyPDFLoader(temp_file.name)
+            listOfBufferPages.append(buffer_loader.load_and_split())
+            temp_file.close()  # Close the file so PyPDFLoader can access it
+
+    all_pages = listOfPages + listOfBufferPages if buffers else listOfPages
+    all_names = filenames + buffer_names if buffers else filenames
+
+    # Create FAISS indices for all files and buffers
+    faiss_indices = {
+        str(name): FAISS.from_documents(pages, OpenAIEmbeddings(disallowed_special=()))
+        for name, pages in zip(all_names, all_pages)
+    }
+
+    # Clean up temporary files
+    for name in buffer_names:
+        Path(name).unlink(missing_ok=True)
+
     return faiss_indices
 
-@st.cache_data()
-def get_temporary_directory():
-    return tempfile.TemporaryDirectory()
-
-temp_dir = get_temporary_directory()
-upload_folder = Path(temp_dir.name)
-
-faiss_indices = load_vectorstore(upload_folder)
+faiss_indices = load_vectorstore()
 
 def initialize_conversation():
     chat = ChatOpenAI(model_name=model_version, temperature=0)
@@ -118,13 +136,11 @@ with st.sidebar:
 
     uploaded_files = st.file_uploader("Choose files", accept_multiple_files=True)
     if uploaded_files:
-        for uploaded_file in uploaded_files:
-            # Write each uploaded file to the temporary directory
-            file_path = upload_folder / uploaded_file.name
-            with file_path.open("wb") as f:
-                f.write(uploaded_file.getbuffer())
         # Reload the vectorstore with new files including uploaded ones
-        faiss_indices = load_vectorstore(upload_folder)  
+        faiss_indices = load_vectorstore(buffers=uploaded_files)  
+
+        uploaded_file_names = [uploaded_file.name for uploaded_file in uploaded_files]
+        files.extend(uploaded_file_names)
 
     # Add a way to select which files to use for the model query
     selected_files = st.multiselect("Please select the files to query:", options=files)
@@ -151,35 +167,11 @@ if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
     initialize_conversation()
 
-
-# styl = f"""
-# <style>
-#     .stTextInput {{
-#     position: fixed;
-#     bottom: 3rem;
-#     }}
-#     .stButton {{
-#     position: fixed;
-#     bottom: 3rem;
-#     right: 10rem;
-#     }}
-#     .stForm {{
-#     position: fixed;
-#     bottom: 3rem;
-#     }}
-# </style>
-# """
-# st.markdown(styl, unsafe_allow_html=True)
-
 # Main chat container
 chat_container = st.container()
 
 # Handle chat input and display
 with chat_container:
-    # Then the chat input form at the bottom
-    #with st.form(key='user_input_form', clear_on_submit=True):
-    #    user_input = st.text_input("Ask a question over the selected documents:", key="user_input")
-    #    submit_button = st.form_submit_button(label='Submit')
     user_input = st.chat_input("Ask something", key="user_input")
 
     for message in st.session_state.chat_history:
