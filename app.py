@@ -7,6 +7,7 @@ from langchain.memory import ConversationBufferMemory
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.chat_models import ChatOpenAI
 from langchain.document_loaders import PyPDFLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter, CharacterTextSplitter
 import glob
 import pickle
 from pathlib import Path
@@ -32,7 +33,8 @@ def load_vectorstore(buffers=None):
     filenames = list(example_docs_path.glob("*.pdf"))
 
     loaders = [PyPDFLoader(str(filename)) for filename in filenames]
-    listOfPages = [loader.load_and_split() for loader in loaders]
+    text_splitter_instance = CharacterTextSplitter(chunk_size=4000, chunk_overlap=200)
+    listOfPages = [loader.load_and_split(text_splitter=text_splitter_instance) for loader in loaders]
 
     listOfBufferPages = []
     buffer_names = []
@@ -45,7 +47,7 @@ def load_vectorstore(buffers=None):
             with open(temp_file.name, 'wb') as f:
                 f.write(buffer.getbuffer())  # Write buffer contents to a temporary file
             buffer_loader = PyPDFLoader(temp_file.name)
-            bufferPages = buffer_loader.load_and_split()
+            bufferPages = buffer_loader.load_and_split(text_splitter=text_splitter_instance)
             for page in bufferPages:
                 page.metadata['source'] = buffer.name
             listOfBufferPages.append(bufferPages)
@@ -149,7 +151,7 @@ with st.sidebar:
     selected_files = st.multiselect("Please select the files to query:", options=files)
 
     # Add a slider for number of sources to return 1-5
-    num_sources = st.slider("Number of sources per document:", min_value=1, max_value=5, value=1)
+    num_sources = st.slider("Number of sources per document:", min_value=1, max_value=5, value=3)
 
     model_version = st.selectbox(
         "Select the GPT model version:",
@@ -160,6 +162,7 @@ with st.sidebar:
     # Add reset button in sidebar
     if st.button('Reset Chat'):
         st.session_state.chat_history = []
+        st.session_state.context_hashes = set()
         initialize_conversation()
         st.rerun()
 
