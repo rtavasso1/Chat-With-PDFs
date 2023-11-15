@@ -15,9 +15,52 @@ import hashlib
 import tempfile
 import shutil
 import logging
+import streamlit.components.v1 as components
 logging.basicConfig(level=logging.INFO)
 
-st.title("ChatGPT with Document Query")
+
+# Initialize session state variables if they don't exist
+if 'title' not in st.session_state:
+    st.session_state.title = "ChatGPT with Document Query"  # Default title
+if 'show_selector' not in st.session_state:
+    st.session_state.show_selector = False  # Selector is hidden by default
+
+# Custom CSS to hide the Streamlit branding and hamburger menu (optional)
+st.markdown("""
+    <style>
+        header > div:first-child {
+            visibility: hidden;
+        }
+        header > div:last-child {
+            visibility: hidden;
+        }
+        .css-18e3th9 {
+            padding-top: 0;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+# Place the button and title in a columns layout
+col1, col2 = st.columns([9, 1])  # Adjust the width ratios as needed
+
+with col1:
+    # Display the title based on the session state
+    st.title(st.session_state.title)
+
+with col2:
+    # Using a button to toggle the display of the title selector
+    if st.button('🔧', key='toggle_title_selector'):
+        st.session_state.show_selector = not st.session_state.show_selector
+
+# Hidden title selector dropdown
+if st.session_state.show_selector:
+    option = st.selectbox(
+        'Choose the title:',
+        ['KJ Document Query', 'RfR Helpdesk Automation'],
+        key='title_selector'
+    )
+    # Update the title in the session state
+    st.session_state.title = option
 
 
 # Define necessary embedding model, LLM, and vectorstore
